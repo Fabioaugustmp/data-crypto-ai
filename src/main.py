@@ -73,8 +73,26 @@ def main():
         # logger.info(f"Diferenças previstas: {diff(test_predictions, y[:5]).flat[:5]}")
 
         # Informações do modelo
-        model_info = model.get_feature_importance()
-        logger.info(f"Informações do modelo: {model_info}")
+        try:
+            # Informações do modelo
+            model_info = model.get_feature_importance()
+            logger.info(f"Informações do modelo: {model_info}")
+        except AttributeError as e:
+            # Fallback para quando get_feature_importance não existe
+            logger.warning(f"Método get_feature_importance não disponível: {e}")
+            try:
+                # Tentar obter informações básicas do modelo
+                model_info = {
+                    'n_features_in': getattr(model, 'n_features_in_', 'N/A'),
+                    'model_type': type(model).__name__,
+                    'params': getattr(model, 'get_params', lambda: {})()
+                }
+                logger.info(f"Informações básicas do modelo: {model_info}")
+            except Exception as fallback_error:
+                logger.warning(f"Não foi possível obter informações do modelo: {fallback_error}")
+        except Exception as e:
+            logger.warning(f"Erro ao obter informações do modelo: {e}")
+            # Continuar execução mesmo com erro
 
         # logger.info("------------------------------------------------------")
 

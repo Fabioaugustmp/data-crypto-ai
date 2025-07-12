@@ -28,21 +28,21 @@ class TestDataLoader:
         """
         if data is None:
             data = [
-                ['2023-01-01', 100.0, 110.0, 90.0, 105.0, 1000],
-                ['2023-01-02', 105.0, 115.0, 95.0, 110.0, 1100],
-                ['2023-01-03', 110.0, 120.0, 100.0, 115.0, 1200],
-                ['2023-01-04', 115.0, 125.0, 105.0, 120.0, 1300],
-                ['2023-01-05', 120.0, 130.0, 110.0, 125.0, 1400],
-                ['2023-01-06', 125.0, 135.0, 115.0, 130.0, 1500],
-                ['2023-01-07', 130.0, 140.0, 120.0, 135.0, 1600],
-                ['2023-01-08', 135.0, 145.0, 125.0, 140.0, 1700],
-                ['2023-01-09', 140.0, 150.0, 130.0, 145.0, 1800],
-                ['2023-01-10', 145.0, 155.0, 135.0, 150.0, 1900],
-                ['2023-01-11', 150.0, 160.0, 140.0, 155.0, 2000],
-                ['2023-01-12', 155.0, 165.0, 145.0, 160.0, 2100],
-                ['2023-01-13', 160.0, 170.0, 150.0, 165.0, 2200],
-                ['2023-01-14', 165.0, 175.0, 155.0, 170.0, 2300],
-                ['2023-01-15', 170.0, 180.0, 160.0, 175.0, 2400],
+                ['2023-01-01', 'BTC/USD', 100.0, 110.0, 90.0, 105.0, 1000],
+                ['2023-01-02', 'BTC/USD', 105.0, 115.0, 95.0, 110.0, 1100],
+                ['2023-01-03', 'BTC/USD', 110.0, 120.0, 100.0, 115.0, 1200],
+                ['2023-01-04', 'BTC/USD', 115.0, 125.0, 105.0, 120.0, 1300],
+                ['2023-01-05', 'BTC/USD', 120.0, 130.0, 110.0, 125.0, 1400],
+                ['2023-01-06', 'BTC/USD', 125.0, 135.0, 115.0, 130.0, 1500],
+                ['2023-01-07', 'BTC/USD', 130.0, 140.0, 120.0, 135.0, 1600],
+                ['2023-01-08', 'BTC/USD', 135.0, 145.0, 125.0, 140.0, 1700],
+                ['2023-01-09', 'BTC/USD', 140.0, 150.0, 130.0, 145.0, 1800],
+                ['2023-01-10', 'BTC/USD', 145.0, 155.0, 135.0, 150.0, 1900],
+                ['2023-01-11', 'BTC/USD', 150.0, 160.0, 140.0, 155.0, 2000],
+                ['2023-01-12', 'BTC/USD', 155.0, 165.0, 145.0, 160.0, 2100],
+                ['2023-01-13', 'BTC/USD', 160.0, 170.0, 150.0, 165.0, 2200],
+                ['2023-01-14', 'BTC/USD', 165.0, 175.0, 155.0, 170.0, 2300],
+                ['2023-01-15', 'BTC/USD', 170.0, 180.0, 160.0, 175.0, 2400],
             ]
         
         if reverse_order:
@@ -54,7 +54,7 @@ class TestDataLoader:
             
             # Escrever cabeçalho
             if has_header:
-                f.write("date,open,high,low,close,volume\n")
+                f.write("date,symbol,open,high,low,close,volume\n")
             
             # Escrever dados
             for row in data:
@@ -71,31 +71,23 @@ class TestDataLoader:
             print("Conteúdo do CSV:")
             print(f.read())
         
-        # Debug: ver como o pandas lê o CSV com skiprows=1
-        import pandas as pd
-        df_debug = pd.read_csv(temp_file, skiprows=1)
-        print("Colunas do DataFrame (após skiprows=1):")
-        print(df_debug.columns.tolist())
-        print("Primeiras linhas:")
-        print(df_debug.head())
-        
         try:
-            X, y, scaler = load_data(temp_file, window_size=5)
+            # Carregar dados sem window_size
+            X, y, scaler = load_data(temp_file)
             
-            # Verificar shapes
+            # Verificar shapes básicos
             assert X.shape[0] == y.shape[0]
-            assert X.shape[1] == 5  # window_size
             assert len(X.shape) == 2
             assert len(y.shape) == 1
             
-            # Verificar que temos dados suficientes
-            expected_samples = 15 - 5  # 15 linhas - window_size
-            assert X.shape[0] == expected_samples
+            # Verificar que temos dados
+            assert X.shape[0] > 0
+            assert y.shape[0] > 0
             
             # Verificar se o scaler foi criado
             assert isinstance(scaler, MinMaxScaler)
             
-            # Verificar se os dados estão normalizados (entre 0 e 1)
+            # Verificar se os dados y estão normalizados (entre 0 e 1)
             assert np.all(y >= 0) and np.all(y <= 1)
             
             print(f"✓ Teste básico passou: X.shape={X.shape}, y.shape={y.shape}")
@@ -105,21 +97,24 @@ class TestDataLoader:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
 
-    def test_load_data_different_window_sizes(self):
-        """Testa diferentes tamanhos de janela"""
+    def test_load_data_columns(self):
+        """Testa se as colunas corretas são carregadas"""
         temp_file = self.create_test_csv()
         
         try:
-            for window_size in [3, 5, 7, 10]:
-                X, y, scaler = load_data(temp_file, window_size=window_size)
-                
-                # Verificar shapes
-                assert X.shape[1] == window_size
-                expected_samples = 15 - window_size
-                assert X.shape[0] == expected_samples
-                
-                print(f"✓ Window size {window_size}: X.shape={X.shape}, y.shape={y.shape}")
-                
+            X, y, scaler = load_data(temp_file)
+            
+            # X deve ter as features (excluindo date, symbol, close)
+            # Com 7 colunas originais (date, symbol, open, high, low, close, volume)
+            # X deve ter 4 colunas (open, high, low, volume)
+            expected_features = 4
+            assert X.shape[1] == expected_features
+            
+            # y deve ser unidimensional (close prices)
+            assert len(y.shape) == 1
+            
+            print(f"✓ Teste colunas passou: X tem {X.shape[1]} features")
+            
         finally:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -129,11 +124,11 @@ class TestDataLoader:
         temp_file = self.create_test_csv(reverse_order=True)
         
         try:
-            X, y, scaler = load_data(temp_file, window_size=5)
+            X, y, scaler = load_data(temp_file)
             
             # Verificar que funcionou mesmo com ordem reversa
             assert X.shape[0] == y.shape[0]
-            assert X.shape[1] == 5
+            assert X.shape[0] > 0
             
             print(f"✓ Teste ordem reversa passou: X.shape={X.shape}, y.shape={y.shape}")
             
@@ -145,26 +140,26 @@ class TestDataLoader:
         """Testa dados com valores ausentes"""
         # Criar dados com alguns valores NaN
         data_with_nan = [
-            ['2023-01-01', 100.0, 110.0, 90.0, 105.0, 1000],
-            ['2023-01-02', 105.0, 115.0, 95.0, 'NaN', 1100],  # close como NaN
-            ['2023-01-03', 110.0, 120.0, 100.0, 115.0, 1200],
-            ['2023-01-04', 115.0, 125.0, 105.0, 120.0, 1300],
-            ['2023-01-05', 120.0, 130.0, 110.0, 125.0, 1400],
-            ['2023-01-06', 125.0, 135.0, 115.0, 130.0, 1500],
-            ['2023-01-07', 130.0, 140.0, 120.0, 135.0, 1600],
-            ['2023-01-08', 135.0, 145.0, 125.0, 140.0, 1700],
-            ['2023-01-09', 140.0, 150.0, 130.0, 145.0, 1800],
-            ['2023-01-10', 145.0, 155.0, 135.0, 150.0, 1900],
+            ['2023-01-01', 'BTC/USD', 100.0, 110.0, 90.0, 105.0, 1000],
+            ['2023-01-02', 'BTC/USD', 105.0, 115.0, 95.0, 'NaN', 1100],  # close como NaN
+            ['2023-01-03', 'BTC/USD', 110.0, 120.0, 100.0, 115.0, 1200],
+            ['2023-01-04', 'BTC/USD', 115.0, 125.0, 105.0, 120.0, 1300],
+            ['2023-01-05', 'BTC/USD', 120.0, 130.0, 110.0, 125.0, 1400],
+            ['2023-01-06', 'BTC/USD', 125.0, 135.0, 115.0, 130.0, 1500],
+            ['2023-01-07', 'BTC/USD', 130.0, 140.0, 120.0, 135.0, 1600],
+            ['2023-01-08', 'BTC/USD', 135.0, 145.0, 125.0, 140.0, 1700],
+            ['2023-01-09', 'BTC/USD', 140.0, 150.0, 130.0, 145.0, 1800],
+            ['2023-01-10', 'BTC/USD', 145.0, 155.0, 135.0, 150.0, 1900],
         ]
         
         temp_file = self.create_test_csv(data=data_with_nan)
         
         try:
-            X, y, scaler = load_data(temp_file, window_size=5)
+            X, y, scaler = load_data(temp_file)
             
             # Verificar que os dados NaN foram removidos
             assert X.shape[0] == y.shape[0]
-            assert X.shape[1] == 5
+            assert X.shape[0] > 0
             
             # Verificar que não há NaN nos dados finais
             assert not np.any(np.isnan(X))
@@ -178,23 +173,22 @@ class TestDataLoader:
 
     def test_load_data_insufficient_data(self):
         """Testa comportamento com dados insuficientes"""
-        # Criar dados com menos linhas que o window_size
+        # Criar dados com apenas algumas linhas
         small_data = [
-            ['2023-01-01', 100.0, 110.0, 90.0, 105.0, 1000],
-            ['2023-01-02', 105.0, 115.0, 95.0, 110.0, 1100],
-            ['2023-01-03', 110.0, 120.0, 100.0, 115.0, 1200],
+            ['2023-01-01', 'BTC/USD', 100.0, 110.0, 90.0, 105.0, 1000],
+            ['2023-01-02', 'BTC/USD', 105.0, 115.0, 95.0, 110.0, 1100],
         ]
         
         temp_file = self.create_test_csv(data=small_data)
         
         try:
-            X, y, scaler = load_data(temp_file, window_size=5)
+            X, y, scaler = load_data(temp_file)
             
-            # Com apenas 3 linhas de dados e window_size=5, não deve haver amostras
-            assert X.shape[0] == 0
-            assert y.shape[0] == 0
+            # Com 2 linhas, deve ter 2 amostras
+            assert X.shape[0] == 2
+            assert y.shape[0] == 2
             
-            print(f"✓ Teste dados insuficientes passou: X.shape={X.shape}, y.shape={y.shape}")
+            print(f"✓ Teste dados pequenos passou: X.shape={X.shape}, y.shape={y.shape}")
             
         finally:
             if os.path.exists(temp_file):
@@ -229,14 +223,60 @@ class TestDataLoader:
             temp_file = f.name
         
         try:
-            X, y, scaler = load_data(temp_file, window_size=5)
+            X, y, scaler = load_data(temp_file)
             
             # Verificar que funcionou com dados reais
             assert X.shape[0] == y.shape[0]
-            assert X.shape[1] == 5
-            assert X.shape[0] == 10 - 5  # 10 linhas - window_size
+            assert X.shape[0] == 10  # 10 linhas de dados
             
             print(f"✓ Teste formato crypto real passou: X.shape={X.shape}, y.shape={y.shape}")
+            
+        finally:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
+
+    def test_load_data_normalization(self):
+        """Testa se a normalização está funcionando corretamente"""
+        temp_file = self.create_test_csv()
+        
+        try:
+            X, y, scaler = load_data(temp_file)
+            
+            # Verificar se y está normalizado (entre 0 e 1)
+            assert np.all(y >= 0) and np.all(y <= 1)
+            
+            # Verificar se o scaler pode desnormalizar
+            y_original = scaler.inverse_transform(y.reshape(-1, 1)).flatten()
+            
+            # Os valores originais devem ser diferentes dos normalizados
+            assert not np.allclose(y, y_original)
+            
+            # Os valores originais devem estar na faixa esperada (105-175)
+            assert np.min(y_original) >= 100
+            assert np.max(y_original) <= 200
+            
+            print(f"✓ Teste normalização passou: y_norm={y[:3]}, y_orig={y_original[:3]}")
+            
+        finally:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
+
+    def test_load_data_feature_selection(self):
+        """Testa se as features corretas são selecionadas"""
+        temp_file = self.create_test_csv()
+        
+        try:
+            X, y, scaler = load_data(temp_file)
+            
+            # X deve conter as features numéricas exceto close
+            # Com o formato padrão: date, symbol, open, high, low, close, volume
+            # X deve ter: open, high, low, volume (4 features)
+            assert X.shape[1] == 4
+            
+            # Verificar se não há valores string em X
+            assert X.dtype in [np.float64, np.float32]
+            
+            print(f"✓ Teste seleção de features passou: {X.shape[1]} features selecionadas")
             
         finally:
             if os.path.exists(temp_file):

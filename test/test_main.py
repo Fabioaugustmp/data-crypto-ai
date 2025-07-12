@@ -17,8 +17,7 @@ def test_main_with_valid_args():
         'main.py',
         '--crypto', 'data/Poloniex_BTCUSDC_d.csv',
         '--model', 'mlp',
-        '--kfolds', '3',
-        '--window_size', '5'
+        '--kfolds', '3'
     ]
     
     with patch.object(sys, 'argv', test_args):
@@ -27,9 +26,9 @@ def test_main_with_valid_args():
             with patch('main.train_model') as mock_train_model:
                 # Configurar mocks
                 mock_load_data.return_value = (
-                    np.random.rand(100, 5),  # X
+                    np.random.rand(100, 4),  # X (4 features: open, high, low, volume)
                     np.random.rand(100),     # y
-                    None                     # _
+                    None                     # scaler
                 )
                 
                 mock_train_model.return_value = (
@@ -101,8 +100,7 @@ def test_main_argument_parsing():
         'main.py',
         '--crypto', 'test.csv',
         '--model', 'mlp',
-        '--kfolds', '10',
-        '--window_size', '15'
+        '--kfolds', '10'
     ]
     
     with patch.object(sys, 'argv', test_args):
@@ -110,7 +108,7 @@ def test_main_argument_parsing():
             with patch('main.train_model') as mock_train_model:
                 # Configurar mocks
                 mock_load_data.return_value = (
-                    np.random.rand(50, 15),
+                    np.random.rand(50, 4),  # 4 features padrão
                     np.random.rand(50),
                     None
                 )
@@ -126,14 +124,13 @@ def test_main_argument_parsing():
                 # Verificar se os argumentos foram passados corretamente
                 assert result == 0
                 
-                # Verificar se load_data foi chamado com window_size correto
-                mock_load_data.assert_called_with('test.csv', window_size=15)
+                # Verificar se load_data foi chamado
+                mock_load_data.assert_called_with('test.csv')
                 
                 # Verificar se train_model foi chamado com kfolds correto
                 args, kwargs = mock_train_model.call_args
-                # A função train_model recebe (X, y, model_class, kfolds, **kwargs)
-                # Então kfolds é o 4º argumento (índice 3)
-                assert kwargs.get('kfolds', args[3] if len(args) > 3 else None) == 10  # kfolds
+                # A função train_model recebe (X, y, model_class, kfolds)
+                assert args[3] == 10  # kfolds
 
 
 def test_main_default_arguments():
@@ -148,7 +145,7 @@ def test_main_default_arguments():
             with patch('main.train_model') as mock_train_model:
                 # Configurar mocks
                 mock_load_data.return_value = (
-                    np.random.rand(50, 10),
+                    np.random.rand(50, 4),  # 4 features padrão
                     np.random.rand(50),
                     None
                 )
@@ -165,11 +162,10 @@ def test_main_default_arguments():
                 assert result == 0
                 
                 # Verificar argumentos padrão
-                mock_load_data.assert_called_with('data/Poloniex_BTCUSDC_d.csv', window_size=10)
+                mock_load_data.assert_called_with('data/Poloniex_BTCUSDC_d.csv')
                 args, kwargs = mock_train_model.call_args
-                # A função train_model recebe (X, y, model_class, kfolds, **kwargs)
-                # Então kfolds é o 4º argumento (índice 3)
-                assert kwargs.get('kfolds', args[3] if len(args) > 3 else None) == 5  # kfolds padrão
+                # Verificar kfolds padrão (5)
+                assert args[3] == 5  # kfolds padrão
 
 
 def test_main_logging():
@@ -191,7 +187,7 @@ def test_main_logging():
                     
                     # Configurar outros mocks
                     mock_load_data.return_value = (
-                        np.random.rand(50, 10),
+                        np.random.rand(50, 4),
                         np.random.rand(50),
                         None
                     )
@@ -224,7 +220,7 @@ def test_main_model_predictions():
         with patch('main.load_data') as mock_load_data:
             with patch('main.train_model') as mock_train_model:
                 # Configurar mocks
-                X_test = np.random.rand(50, 10)
+                X_test = np.random.rand(50, 4)
                 y_test = np.random.rand(50)
                 
                 mock_load_data.return_value = (X_test, y_test, None)
@@ -232,7 +228,7 @@ def test_main_model_predictions():
                 mock_model = MagicMock()
                 mock_model.predict.return_value = np.random.rand(5, 1)
                 mock_model.get_feature_importance.return_value = {
-                    'n_features_in': 10,
+                    'n_features_in': 4,
                     'n_layers': 3,
                     'n_outputs': 1
                 }
@@ -272,14 +268,14 @@ def test_main_invalid_model_type():
     with patch.object(sys, 'argv', test_args):
         with patch('main.load_data') as mock_load_data:
             mock_load_data.return_value = (
-                np.random.rand(50, 10),
+                np.random.rand(50, 4),
                 np.random.rand(50),
                 None
             )
             
-            # Deve executar normalmente (MLP é padrão)
+            # Modelo inválido deve retornar 1 (erro)
             result = main()
-            assert result == 0
+            assert result == 1
 
 
 def test_main_with_small_dataset():
@@ -296,7 +292,7 @@ def test_main_with_small_dataset():
             with patch('main.train_model') as mock_train_model:
                 # Dataset muito pequeno
                 mock_load_data.return_value = (
-                    np.random.rand(5, 10),
+                    np.random.rand(5, 4),
                     np.random.rand(5),
                     None
                 )
@@ -313,14 +309,57 @@ def test_main_with_small_dataset():
                 assert result == 0
 
 
+def test_main_different_models():
+    """Testa main com diferentes tipos de modelo"""
+    models = ['mlp', 'pln', 'logistic', 'lr']
+    
+    for model_type in models:
+        test_args = [
+            'main.py',
+            '--crypto', 'data/Poloniex_BTCUSDC_d.csv',
+            '--model', model_type,
+            '--kfolds', '3'
+        ]
+        
+        with patch.object(sys, 'argv', test_args):
+            with patch('main.load_data') as mock_load_data:
+                with patch('main.train_model') as mock_train_model:
+                    # Configurar mocks
+                    mock_load_data.return_value = (
+                        np.random.rand(50, 4),
+                        np.random.rand(50),
+                        None
+                    )
+                    
+                    mock_model = MagicMock()
+                    mock_model.predict.return_value = np.random.rand(5, 1)
+                    mock_model.get_feature_importance.return_value = {
+                        'model_type': model_type,
+                        'n_features_in': 4
+                    }
+                    
+                    mock_train_model.return_value = (
+                        mock_model,
+                        {'mse_mean': 0.1, 'mse_std': 0.01, 'mae_mean': 0.05, 
+                         'mae_std': 0.005, 'r2_mean': 0.8, 'r2_std': 0.02}
+                    )
+                    
+                    result = main()
+                    
+                    # Deve executar com sucesso para todos os modelos válidos
+                    assert result == 0
+
+
 def test_main_integration():
     """Teste de integração básico"""
     # Criar arquivo CSV temporário
     with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        # Linha que será ignorada (skiprows=1)
+        f.write("https://www.CryptoDataDownload.com\n")
         # Escrever cabeçalho e dados de teste
-        f.write("date,open,high,low,close,volume\n")
+        f.write("date,symbol,open,high,low,close,volume\n")
         for i in range(50):
-            f.write(f"2023-01-{i:02d},100.{i},110.{i},90.{i},105.{i},1000{i}\n")
+            f.write(f"2023-01-{i+1:02d},BTC/USD,100.{i},110.{i},90.{i},105.{i},1000{i}\n")
         temp_file = f.name
     
     try:
@@ -328,8 +367,7 @@ def test_main_integration():
             'main.py',
             '--crypto', temp_file,
             '--model', 'mlp',
-            '--kfolds', '2',
-            '--window_size', '3'
+            '--kfolds', '2'
         ]
         
         with patch.object(sys, 'argv', test_args):
@@ -342,3 +380,114 @@ def test_main_integration():
     finally:
         if os.path.exists(temp_file):
             os.unlink(temp_file)
+
+
+def test_main_feature_importance_error():
+    """Testa main quando get_feature_importance falha"""
+    test_args = [
+        'main.py',
+        '--crypto', 'data/Poloniex_BTCUSDC_d.csv',
+        '--model', 'mlp',
+        '--kfolds', '3'
+    ]
+    
+    with patch.object(sys, 'argv', test_args):
+        with patch('main.load_data') as mock_load_data:
+            with patch('main.train_model') as mock_train_model:
+                # Configurar mocks
+                mock_load_data.return_value = (
+                    np.random.rand(50, 4),
+                    np.random.rand(50),
+                    None
+                )
+                
+                mock_model = MagicMock()
+                mock_model.predict.return_value = np.random.rand(5, 1)
+                # Simular erro no get_feature_importance
+                mock_model.get_feature_importance.side_effect = AttributeError("Método não existe")
+                
+                mock_train_model.return_value = (
+                    mock_model,
+                    {'mse_mean': 0.1, 'mse_std': 0.01, 'mae_mean': 0.05, 
+                     'mae_std': 0.005, 'r2_mean': 0.8, 'r2_std': 0.02}
+                )
+                
+                result = main()
+                
+                # Deve executar mesmo com erro em get_feature_importance
+                assert result == 0
+
+
+def test_main_predict_error():
+    """Testa main quando predict falha"""
+    test_args = [
+        'main.py',
+        '--crypto', 'data/Poloniex_BTCUSDC_d.csv',
+        '--model', 'mlp',
+        '--kfolds', '3'
+    ]
+    
+    with patch.object(sys, 'argv', test_args):
+        with patch('main.load_data') as mock_load_data:
+            with patch('main.train_model') as mock_train_model:
+                # Configurar mocks
+                mock_load_data.return_value = (
+                    np.random.rand(50, 4),
+                    np.random.rand(50),
+                    None
+                )
+                
+                mock_model = MagicMock()
+                # Simular erro no predict
+                mock_model.predict.side_effect = Exception("Erro na predição")
+                mock_model.get_feature_importance.return_value = {'n_features_in': 4}
+                
+                mock_train_model.return_value = (
+                    mock_model,
+                    {'mse_mean': 0.1, 'mse_std': 0.01, 'mae_mean': 0.05, 
+                     'mae_std': 0.005, 'r2_mean': 0.8, 'r2_std': 0.02}
+                )
+                
+                result = main()
+                
+                # Deve retornar erro se predict falhar
+                assert result == 1
+
+
+def test_main_high_kfolds():
+    """Testa main com número alto de kfolds"""
+    test_args = [
+        'main.py',
+        '--crypto', 'data/Poloniex_BTCUSDC_d.csv',
+        '--model', 'mlp',
+        '--kfolds', '20'
+    ]
+    
+    with patch.object(sys, 'argv', test_args):
+        with patch('main.load_data') as mock_load_data:
+            with patch('main.train_model') as mock_train_model:
+                # Configurar mocks
+                mock_load_data.return_value = (
+                    np.random.rand(100, 4),  # Dataset maior para suportar 20 folds
+                    np.random.rand(100),
+                    None
+                )
+                
+                mock_train_model.return_value = (
+                    MagicMock(),
+                    {'mse_mean': 0.1, 'mse_std': 0.01, 'mae_mean': 0.05, 
+                     'mae_std': 0.005, 'r2_mean': 0.8, 'r2_std': 0.02}
+                )
+                
+                result = main()
+                
+                # Deve executar com sucesso
+                assert result == 0
+                
+                # Verificar se kfolds foi passado corretamente
+                args, kwargs = mock_train_model.call_args
+                assert args[3] == 20  # kfolds
+
+
+if __name__ == '__main__':
+    pytest.main([__file__, '-v'])
