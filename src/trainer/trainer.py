@@ -1,7 +1,9 @@
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.neural_network import MLPRegressor
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler 
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
 import numpy as np
 import logging
 
@@ -9,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 def train_model(X: np.ndarray, y: np.ndarray, model_class=MLPRegressor, kfolds: int = 5, **model_kwargs):
     """
-    Treina um modelo MLPRegressor usando TimeSeriesSplit para validação cronológica.
+    Treina um modelo usando TimeSeriesSplit para validação cronológica.
     
     Args:
         X (np.ndarray): Features de entrada (ordenadas cronologicamente)
         y (np.ndarray): Valores target (ordenados cronologicamente)
-        model_class (class): Classe do modelo (MLPRegressor)
+        model_class (class): Classe do modelo
         kfolds (int): Número de splits para validação temporal
         **model_kwargs: Argumentos adicionais para o modelo
     
@@ -23,19 +25,31 @@ def train_model(X: np.ndarray, y: np.ndarray, model_class=MLPRegressor, kfolds: 
     """
     logger.info(f"Iniciando treinamento com {kfolds} splits temporais")
     
-    # Configurações padrão para MLPRegressor
-    default_params = {
-        'hidden_layer_sizes': (100, 50),
-        'activation': 'relu',
-        'solver': 'adam',
-        'alpha': 0.0001,
-        'learning_rate_init': 0.001,
-        'max_iter': 1000,
-        'random_state': 42,
-        'early_stopping': True,
-        'validation_fraction': 0.1,
-        'n_iter_no_change': 10
-    }
+    # Configurações padrão baseadas no tipo de modelo
+    if model_class.__name__ == 'MLP' or model_class.__name__ == 'MLPRegressor':
+        default_params = {
+            'hidden_layer_sizes': (100, 50),
+            'activation': 'relu',
+            'solver': 'adam',
+            'alpha': 0.0001,
+            'learning_rate_init': 0.001,
+            'max_iter': 1000,
+            'random_state': 42,
+            'early_stopping': True,
+            'validation_fraction': 0.1,
+            'n_iter_no_change': 10
+        }
+    elif model_class.__name__ == 'PLN':
+        default_params = {
+            'degree': 2,  # Para polynomial features
+            'fit_intercept': True,
+            'copy_X': True,
+            'n_jobs': None,
+            'positive': False
+        }
+    else:
+        # Para outros modelos, usar parâmetros vazios
+        default_params = {}
     
     # Atualizar com parâmetros fornecidos
     default_params.update(model_kwargs)

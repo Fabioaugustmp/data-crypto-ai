@@ -1,6 +1,9 @@
 import argparse
 from utils.data_loader import load_data
-from models.model import MLP
+from models.model_mlp import MLP
+from models.model_polynomial import PLN
+from models.model_logistic import LRM
+
 from trainer.trainer import train_model #, train_model_with_walk_forward
 from utils.logger import setup_logger
 
@@ -28,7 +31,25 @@ def main():
         logger.info(f"Dados carregados: X={X.shape}, y={y.shape}")
 
         # Definir classe do modelo
-        model_class = MLP
+        logger.info("Selecionando modelo...")
+        model_mapping = {
+            'mlp': MLP,
+            'pln': PLN,
+            'lr': LRM,
+            'logistic': LRM,  # Alias para LRM
+            'mlpregressor': MLP,  # Alias para MLP
+            'polynomial': PLN  # Alias para PLN
+
+        }
+
+        model_name = args.model.lower()
+        if model_name in model_mapping:
+            model_class = model_mapping[model_name]
+            logger.info(f"Modelo selecionado: {model_class.__name__}")
+        else:
+            available_models = list(model_mapping.keys())
+            logger.error(f"Modelo '{args.model}' não encontrado. Modelos disponíveis: {available_models}")
+            return 1
 
         # Treinar modelo
         logger.info("Iniciando treinamento...")
